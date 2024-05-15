@@ -6,7 +6,9 @@
 #include "DataStructure.h"
 #include <TPZMultiphysicsCompMesh.h>
 #include "DarcyFlow/TPZMixedDarcyFlow.h"
+#include "DarcyFlow/TPZMixedDarcyFlowAniso.h"
 #include "DarcyFlow/TPZHybridDarcyFlow.h"
+#include "DarcyFlow/TPZHybridDarcyFlowAniso.h"
 #include "TPZNullMaterial.h"
 #include "TPZBndCondT.h"
 #include "TPZGenGrid2D.h"
@@ -460,15 +462,16 @@ void InsertMaterialMixed(TPZMultiphysicsCompMesh *cmesh_mixed, ProblemConfig con
         cmesh_mixed->SetDimModel(dim);
         cmesh_mixed->SetAllCreateFunctionsMultiphysicElem();
 
-        TPZMixedDarcyFlow *material = new TPZMixedDarcyFlow(matID, dim); //Using standard PermealityTensor = Identity.
-        material->SetPermeability(config.perm);
         
 #ifndef OPTMIZE_RUN_TIME
-        
+        TPZMixedDarcyFlowAniso *material = new TPZMixedDarcyFlowAniso(matID, dim);
+
+            material->SetPermeability(config.perm);
             material->SetForcingFunction(config.exact->ForceFunc(),5);
             material->SetExactSol(config.exact->ExactSolution(),5);
 #else
-        DebugStop();
+        TPZMixedDarcyFlow *material = new TPZMixedDarcyFlow(matID, dim);
+        material->SetConstantPermeability(1.);
         std::function<void (const TPZVec<REAL> &loc, TPZVec<STATE> &result)> sourceFunc = [](const TPZVec<REAL> &loc,TPZVec<STATE> &result)
         {
             for(auto &it:result) it = 1.;
@@ -510,19 +513,21 @@ void InsertMaterialHybrid(TPZMultiphysicsCompMesh *cmesh_H1Hybrid, ProblemConfig
 
     // Creates Poisson material
     if(pConfig.type != 2) {
-        TPZHybridDarcyFlow *material = new TPZHybridDarcyFlow(matID, dim);
-        //material->SetConstantPermeability(1.);
+        
+
+#ifndef OPTMIZE_RUN_TIME
+        TPZHybridDarcyFlowAniso *material = new TPZHybridDarcyFlowAniso(matID, dim);
         TPZFMatrix<STATE> KPerm = config.perm;
         material->SetPermTensor(KPerm);
         cmesh_H1Hybrid->InsertMaterialObject(material);
         cmesh_H1Hybrid->SetAllCreateFunctionsMultiphysicElem();
-
-
-#ifndef OPTMIZE_RUN_TIME
             material->SetForcingFunction(config.exact->ForceFunc(),5);
             material->SetExactSol(config.exact->ExactSolution(),5);
 #else
-            material->SetConstantPermeability(1.);
+        TPZHybridDarcyFlow *material = new TPZHybridDarcyFlow(matID, dim);
+        cmesh_H1Hybrid->InsertMaterialObject(material);
+        cmesh_H1Hybrid->SetAllCreateFunctionsMultiphysicElem();
+        material->SetConstantPermeability(1.);
 #endif
         // Inserts boundary conditions
         TPZFMatrix<STATE> val1(1, 1, 0.);

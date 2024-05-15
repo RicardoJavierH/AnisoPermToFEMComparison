@@ -2,20 +2,18 @@
 // Created by Gustavo Batistela on 5/13/21.
 //
 
-#include "TPZHybridDarcyFlow.h"
+#include "TPZHybridDarcyFlowAniso.h"
 #include "pzaxestools.h"
 #include "TPZLapack.h"
 
-TPZHybridDarcyFlow::TPZHybridDarcyFlow() : TPZRegisterClassId(&TPZHybridDarcyFlow::ClassId),
-                               TPZMatCombinedSpacesT<STATE>(), TPZDarcyFlow() {}
+TPZHybridDarcyFlowAniso::TPZHybridDarcyFlowAniso() : TPZRegisterClassId(&TPZHybridDarcyFlowAniso::ClassId),
+                               TPZMatCombinedSpacesT<STATE>(), TPZDarcyFlowAniso() {}
 
-TPZHybridDarcyFlow::TPZHybridDarcyFlow(int id, int dim) : TPZRegisterClassId(&TPZHybridDarcyFlow::ClassId),
-                                        TPZDarcyFlow(id,dim) {}
-
-
+TPZHybridDarcyFlowAniso::TPZHybridDarcyFlowAniso(int id, int dim) : TPZRegisterClassId(&TPZHybridDarcyFlowAniso::ClassId),
+                                        TPZDarcyFlowAniso(id,dim) {}
 
 
-int TPZHybridDarcyFlow::VariableIndex(const std::string &name) const {
+int TPZHybridDarcyFlowAniso::VariableIndex(const std::string &name) const {
 
     if (!strcmp("Solution", name.c_str())) return 1;
     if (!strcmp("Pressure", name.c_str())) return 1;
@@ -37,10 +35,46 @@ int TPZHybridDarcyFlow::VariableIndex(const std::string &name) const {
     if (!strcmp("ExactDivergence", name.c_str())) return 12;
     if (!strcmp("FluxL2", name.c_str())) return 13;
 
-    return TPZDarcyFlow::VariableIndex(name);
+    return TPZDarcyFlowAniso::VariableIndex(name);
 }
 
-int TPZHybridDarcyFlow::NSolutionVariables(int var) const {
+ void TPZHybridDarcyFlowAniso::Solution(const TPZVec<TPZMaterialDataT<STATE>> &datavec,
+                      int var, TPZVec<STATE> &sol)  {
+     switch (var) {
+         case 1:{
+             REAL p = datavec[1].sol[0][0];
+             sol[0] = p;
+         }
+             break;
+         case 7:{
+             // KDuDx;
+             TPZFMatrix<STATE> dsoldx(fDim,1,0);
+             TPZAxesTools<STATE>::Axes2XYZ(datavec[1].dsol[0], dsoldx, datavec[0].axes);
+             TPZFMatrix<STATE> perm(fDim,fDim,0), invperm(fDim,fDim,0);
+             GetPermTensor(datavec[0].x, perm, invperm);
+             TPZFMatrix<STATE> Kdsoldx(fDim,1,0);
+             dsoldx.Resize(fDim,1);
+             perm.Multiply(dsoldx, Kdsoldx);
+             
+             for(int i=0; i<fDim; i++){
+                sol[i] = Kdsoldx(i, 0);
+             }
+         }
+             break;
+         case 9:{
+             // ExactPressure/ExactSolution
+             TPZVec<STATE> exact_pressure(1);
+             TPZFMatrix<STATE> exact_flux(fDim, 1);
+             fExactSol(datavec[1].x, exact_pressure, exact_flux);
+             sol[0] = exact_pressure[0];
+         }
+             break;
+         default:
+             break;
+     }
+ }
+
+int TPZHybridDarcyFlowAniso::NSolutionVariables(int var) const {
 
     if (var == 1) return 1;      // Solution/Pressure
     if (var == 2) return fDim;   // Derivative/GradU
@@ -56,23 +90,23 @@ int TPZHybridDarcyFlow::NSolutionVariables(int var) const {
     if (var == 12) return 1;     // ExactDiv/ExactDivergence
     if (var == 13) return fDim;  // FluxL2
 
-    return TPZDarcyFlow::NSolutionVariables(var);
+    return TPZDarcyFlowAniso::NSolutionVariables(var);
 }
 
 
 
-int TPZHybridDarcyFlow::ClassId() const {
-    return Hash("TPZHybridDarcyFlow") ^ TPZDarcyFlow::ClassId() << 1;
+int TPZHybridDarcyFlowAniso::ClassId() const {
+    return Hash("TPZHybridDarcyFlowAniso") ^ TPZDarcyFlowAniso::ClassId() << 1;
 }
 
-TPZMaterial *TPZHybridDarcyFlow::NewMaterial() const {
-    return new TPZHybridDarcyFlow(*this);
+TPZMaterial *TPZHybridDarcyFlowAniso::NewMaterial() const {
+    return new TPZHybridDarcyFlowAniso(*this);
 }
 
-void TPZHybridDarcyFlow::Print(std::ostream &out) const {
+void TPZHybridDarcyFlowAniso::Print(std::ostream &out) const {
     out << "Material Name: " << this->Name() << "\n";
-    out << "Material Id: " << TPZDarcyFlow::Id() << "\n";
-    out << "Dimension: " << TPZDarcyFlow::Dimension() << "\n\n";
+    out << "Material Id: " << TPZDarcyFlowAniso::Id() << "\n";
+    out << "Dimension: " << TPZDarcyFlowAniso::Dimension() << "\n\n";
 }
 
 /** @name Contribute */
@@ -85,7 +119,7 @@ void TPZHybridDarcyFlow::Print(std::ostream &out) const {
  * @param[out] ek is the element matrix
  * @param[out] ef is the rhs vector
  */
-void TPZHybridDarcyFlow::Contribute(const TPZVec<TPZMaterialDataT<STATE>> &datavec,
+void TPZHybridDarcyFlowAniso::Contribute(const TPZVec<TPZMaterialDataT<STATE>> &datavec,
                         REAL weight,TPZFMatrix<STATE> &ek,
                         TPZFMatrix<STATE> &ef)
 {
@@ -119,9 +153,15 @@ void TPZHybridDarcyFlow::Contribute(const TPZVec<TPZMaterialDataT<STATE>> &datav
         fXfLoc = res[0];
     }
 
-    STATE KPerm = GetPermeability(datavec[0].x);
+    TPZFMatrix<STATE> permTensor, invPermTensor;
+    GetPermTensor(datavec[0].x, permTensor, invPermTensor);
+    
+    TPZFMatrix<STATE> KDphi(permTensor.Rows(),dphi.Cols());
+    permTensor.Multiply(dphi, KDphi);
+    
+    //STATE KPerm = GetPermeability(datavec[0].x);
 
-#if defined(USING_MKL)
+#if defined(USING_MKL) && defined(TOTOTO)
     {
         double *A, *B, *C;
         int m, n, k;
@@ -172,7 +212,7 @@ void TPZHybridDarcyFlow::Contribute(const TPZVec<TPZMaterialDataT<STATE>> &datav
         //matrix Sk
         for( int jn = 0; jn < phr; jn++ ) {
             for(kd=0; kd<fDim; kd++) {
-                ek(in,jn) += (STATE)weight*(KPerm*(STATE)(dphi(kd,in)*dphi(kd,jn)));
+                ek(in,jn) += (STATE)weight*(KDphi(kd,in)*dphi(kd,jn));
             }
         }
     }
@@ -190,7 +230,7 @@ void TPZHybridDarcyFlow::Contribute(const TPZVec<TPZMaterialDataT<STATE>> &datav
     }
 }
 
-void TPZHybridDarcyFlow::ContributeBC(const TPZVec<TPZMaterialDataT<STATE>> &datavec, REAL weight, TPZFMatrix<STATE> &ek,TPZFMatrix<STATE> &ef,TPZBndCondT<STATE> &bc)
+void TPZHybridDarcyFlowAniso::ContributeBC(const TPZVec<TPZMaterialDataT<STATE>> &datavec, REAL weight, TPZFMatrix<STATE> &ek,TPZFMatrix<STATE> &ef,TPZBndCondT<STATE> &bc)
 {
     TPZFMatrix<REAL>  &phi_u = datavec[1].phi;
     TPZFMatrix<REAL>  &phi_flux = datavec[0].phi;
@@ -275,7 +315,7 @@ void TPZHybridDarcyFlow::ContributeBC(const TPZVec<TPZMaterialDataT<STATE>> &dat
     }
 }
 
-void TPZHybridDarcyFlow::Errors(const TPZVec<TPZMaterialDataT<STATE>> &data, TPZVec<REAL> &errors)
+void TPZHybridDarcyFlowAniso::Errors(const TPZVec<TPZMaterialDataT<STATE>> &data, TPZVec<REAL> &errors)
 {
     if(!fExactSol) return;
 
@@ -284,7 +324,6 @@ void TPZHybridDarcyFlow::Errors(const TPZVec<TPZMaterialDataT<STATE>> &data, TPZ
 
     TPZManVector<STATE> u_exact(1);
     TPZFNMatrix<9,STATE> du_exact;
-
 
     if(this->fExactSol){
 
@@ -299,10 +338,10 @@ void TPZHybridDarcyFlow::Errors(const TPZVec<TPZMaterialDataT<STATE>> &data, TPZ
 
     // errors[1] Semi norm H1 || grad u ||_l2
 
-    TPZManVector<STATE,3> sol(1),dsol(3,0.);
+    TPZManVector<STATE,3> sol(1),dsol(fDim,0.);
 
     TPZFMatrix<REAL> &dsolaxes = data[1].dsol[0];
-    TPZFNMatrix<9,REAL> flux(3,0);
+    TPZFNMatrix<9,REAL> flux(fDim,0);
     TPZAxesTools<REAL>::Axes2XYZ(dsolaxes, flux, data[1].axes);
 
     for(int id=0; id<fDim; id++) {
@@ -316,25 +355,69 @@ void TPZHybridDarcyFlow::Errors(const TPZVec<TPZMaterialDataT<STATE>> &data, TPZ
 
     // error[3] Energy norm || u ||_e = a(u,u)= int_K K gradu.gradu dx
 
-    STATE KPerm = GetPermeability(data[0].x);
+    //STATE KPerm = GetPermeability(data[0].x);
 
-
+    TPZFMatrix<STATE> permTensor, invPermTensor;
+    GetPermTensor(data[0].x, permTensor, invPermTensor);
+    
+    
     TPZFNMatrix<9,REAL> gradpressure(fDim,1),Kgradu(fDim,1);
     for (int i=0; i<fDim; i++) {
         gradpressure(i,0) = du_exact(i,0);
-        Kgradu(i,0) = gradpressure(0)*KPerm;
     }
+
+    permTensor.Multiply(gradpressure, Kgradu);
+    
+    TPZFMatrix<STATE> Kflux(permTensor.Rows(),flux.Cols(),0.), KDu(permTensor.Rows(),du_exact.Cols(),0.);
+    
+    for(int irow=0; irow<fDim; irow++){
+        for(int icol=0; icol<fDim; icol++){
+            for(int k=0; k<flux.Cols(); k++){
+                Kflux(irow,k) += permTensor(irow,icol)*flux(icol,k);
+            }
+        }
+    }
+
+    for(int irow=0; irow<fDim; irow++){
+        for(int icol=0; icol<fDim; icol++){
+            for(int k=0; k<du_exact.Cols(); k++){
+                KDu(irow,k) += permTensor(irow,icol)*du_exact(icol,k);
+            }
+        }
+    }
+    
+//    permTensor.Multiply(flux, Kflux);
+//    permTensor.Multiply(du_exact, KDu);
 
     REAL energy = 0.;
     for (int i=0; i<fDim; i++) {
         for (int j=0; j<fDim; j++) {
-            double cperm =0.;
-            if(i==j)
-                cperm = KPerm;
-            energy += cperm*fabs(flux(j,0) - du_exact(j,0))*fabs(flux(i,0) - du_exact(i,0));
+            energy += fabs(Kflux(j,0) - KDu(j,0))*fabs(flux(i,0) - du_exact(i,0));
         }
     }
 
     errors[3] = energy;
 }
+
+void  TPZHybridDarcyFlowAniso::SetPermTensor(TPZFMatrix<STATE> permTensor)
+{
+    fPermTensor = permTensor;
+    TPZFNMatrix<100, STATE> copy(permTensor);
+    fInvPermTensor.Redim(copy.Rows(),copy.Rows());
+    int64_t r;
+    for(r=0; r<copy.Rows(); r++) fInvPermTensor(r,r) = 1.;
+    copy.Solve_LU(&fInvPermTensor);
+}
+
+
+void TPZHybridDarcyFlowAniso::GetPermTensor(TPZVec<STATE> &coord,TPZFMatrix<STATE> &permTensor, TPZFMatrix<STATE> &invpermTensor )
+{
+    permTensor = fPermTensor;
+    invpermTensor = fInvPermTensor;
+}
+
+
+
+
+
 /**@}*/

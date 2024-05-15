@@ -2,10 +2,10 @@
 // Created by Gustavo Batistela on 5/13/21.
 //
 
-#ifndef TPZHybridDarcyFlow_H
-#define TPZHybridDarcyFlow_H
+#ifndef TPZHybridDarcyFlowAniso_H
+#define TPZHybridDarcyFlowAniso_H
 
-#include "TPZDarcyFlow.h"
+#include "TPZDarcyFlowAniso.h"
 
 /**
  * @ingroup material
@@ -21,29 +21,52 @@
 #include "TPZMatCombinedSpaces.h"
 #include "TPZMatErrorCombinedSpaces.h"
 
+struct MatTools
+{
+    static TPZFMatrix<STATE> matVecMultMat(TPZFMatrix<STATE> mat, TPZVec<STATE> vec){
+        TPZFMatrix<STATE> res(3,1);
+        for(int irow=0; irow<3; irow++){
+            for(int icol=0; icol<3; icol++){
+                res(irow,0) = mat(irow,icol)*vec[icol];
+            }
+        }
+        return res;
+    };
+    
+    static TPZVec<STATE> matVecMultVec(TPZFMatrix<STATE> mat, TPZVec<STATE> vec)
+    {
+        TPZVec<STATE> res(3,0);
+        for(int irow=0; irow<3; irow++){
+            for(int icol=0; icol<3; icol++){
+                res[irow] = mat(irow,icol)*vec[icol];
+            }
+        }
+        return res;
+    };
+};
 
-class TPZHybridDarcyFlow : public TPZDarcyFlow, public TPZMatCombinedSpacesT<STATE>,public TPZMatErrorCombinedSpaces<STATE> {
+class TPZHybridDarcyFlowAniso : public TPZDarcyFlowAniso, public TPZMatCombinedSpacesT<STATE>,public TPZMatErrorCombinedSpaces<STATE> {
 
 
 public:
     /**
      * @brief Default constructor
      */
-    TPZHybridDarcyFlow();
+    TPZHybridDarcyFlowAniso();
 
     /**
 	 * @brief Class constructor
 	 * @param [in] id material id
 	 * @param [in] dim problem dimension
 	 */
-    TPZHybridDarcyFlow(int id, int dim);
+    TPZHybridDarcyFlowAniso(int id, int dim);
 
-    TPZHybridDarcyFlow(const TPZHybridDarcyFlow &copy) : TPZDarcyFlow(copy), TPZMatCombinedSpacesT<STATE>(copy),
+    TPZHybridDarcyFlowAniso(const TPZHybridDarcyFlowAniso &copy) : TPZDarcyFlowAniso(copy), TPZMatCombinedSpacesT<STATE>(copy),
     TPZMatErrorCombinedSpaces<STATE>(copy){
 
     }
-    TPZHybridDarcyFlow &operator=(const TPZHybridDarcyFlow &copy){
-        TPZDarcyFlow::operator=(copy);
+    TPZHybridDarcyFlowAniso &operator=(const TPZHybridDarcyFlowAniso &copy){
+        TPZDarcyFlowAniso::operator=(copy);
         TPZMatCombinedSpacesT<STATE>::operator=(copy);
         TPZMatErrorCombinedSpaces<STATE>::operator=(copy);
         return *this;
@@ -64,7 +87,7 @@ public:
     /**
 	 * @brief Returns a 'std::string' with the name of the material
 	 */
-    [[nodiscard]] std::string Name() const override { return "TPZHybridDarcyFlow"; }
+    [[nodiscard]] std::string Name() const override { return "TPZHybridDarcyFlowAniso"; }
 
     virtual int NEvalErrors()  const override {return 4;}
 
@@ -108,7 +131,7 @@ public:
         @param[out] sol FEM Solution at the integration point
     */
     virtual void Solution(const TPZVec<TPZMaterialDataT<STATE>> &datavec,
-                          int var, TPZVec<STATE> &sol) override {}
+                          int var, TPZVec<STATE> &sol) override;
     /**
      * @brief Returns an integer associated with a post-processing variable name
      * @param [in] name string containing the name of the post-processing variable. Ex: "Pressure".
@@ -117,7 +140,7 @@ public:
 
     /**
      * @brief Returns an integer with the dimension of a post-processing variable
-     * @param [in] var index of the post-processing variable, according to TPZDarcyFlow::VariableIndex method.
+     * @param [in] var index of the post-processing variable, according to TPZDarcyFlowAniso::VariableIndex method.
      */
     [[nodiscard]] int NSolutionVariables(int var) const override;
 
@@ -174,8 +197,15 @@ public:
         return new  TPZBndCondBase<STATE,TPZMatCombinedSpacesBC<STATE>, TPZMatErrorCombinedSpacesBC<STATE> >
         (reference,id, type,val1,val2);
     }
+    
+    void SetPermTensor(TPZFMatrix<STATE> permTensor);
+    void GetPermTensor(TPZVec<STATE> &coord,TPZFMatrix<STATE> &permTensor, TPZFMatrix<STATE> &invpermTensor );
+    
+    
+private:
+    TPZFMatrix<STATE> fPermTensor, fInvPermTensor;
 
 };
 
 
-#endif //TPZDarcyFlow_H
+#endif //TPZDarcyFlowAniso_H

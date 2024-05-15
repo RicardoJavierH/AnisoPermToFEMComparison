@@ -37,16 +37,15 @@ int main(int argc, char *argv[]) {
     
     PreConfig pConfig;
     pConfig.k = 1;//
-    pConfig.n = 0; // 2/3 for Hybrid 2D/3D
+    pConfig.n = 2; // 2/3 for Hybrid 2D/3D
     pConfig.problem = "EAnisoPerm";              //// {"ESinSin","EArcTan",ESteklovNonConst", "ESteepWave","EAnisoPerm"}
-    pConfig.approx = "Mixed";          //// {"H1","Hybrid", "Mixed", "HybridizedMixed","Hybrid2"}
+    pConfig.approx = "Hybrid";          //// {"H1","Hybrid", "Mixed", "HybridizedMixed","Hybrid2"}
     pConfig.topology = "Quadrilateral";       //// Triangular, Quadrilateral, Tetrahedral, Hexahedral, Prism
     pConfig.refLevel = 2;                     //// How many refinements
     pConfig.postProcess = true;                  //// Print geometric and computational mesh
     pConfig.shouldColor =false;
     pConfig.isTBB = true;
-    pConfig.tData.nThreads = 6;
-    
+    pConfig.tData.nThreads = 1;
     
     if(argc == 2 || argc == 3) {
         pConfig.tData.nThreads = atoi(argv[1]);

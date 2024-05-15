@@ -27,16 +27,16 @@ SOURCES main_ErrorMeasurement.cpp)
 #add_executable(ErrorMeasurement main_ErrorMeasurement.cpp)
 target_link_libraries(ErrorMeasurement PRIVATE Methods Tools)
 
-add_pz_target(
-        NAME HybridizedMixed
-        SOURCES main_HybridizedMixed.cpp)
+#add_pz_target(
+#        NAME HybridizedMixed
+#        SOURCES main_HybridizedMixed.cpp)
 
-target_link_libraries(HybridizedMixed PRIVATE Methods Tools)
+#target_link_libraries(HybridizedMixed PRIVATE Methods Tools)
 
 # Project to apply error estimation for hybrid H1 approximations
-add_pz_target(
-  NAME Mixed
-SOURCES main_Mixed.cpp)
+#add_pz_target(
+#  NAME Mixed
+#SOURCES main_Mixed.cpp)
 
 #add_executable(Mixed main_Mixed.cpp)
-target_link_libraries(Mixed PRIVATE Methods Tools)
+#target_link_libraries(Mixed PRIVATE Methods Tools)

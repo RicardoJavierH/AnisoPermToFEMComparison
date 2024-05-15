@@ -4,26 +4,35 @@ set(public_headers
     TPZAnisotropicPermeability.h 
     TPZIsotropicPermeability.h
     TPZDarcyFlow.h
+    TPZDarcyFlowAniso.h
     TPZHybridDarcyFlow.h
+    TPZHybridDarcyFlowAniso.h
+    TPZMixedDarcyFlowAniso.h
     TPZMixedDarcyFlow.h
-    TPZMixedDarcyFractureFlow.h
+    #TPZMixedDarcyFractureFlowAniso.h
     )
 
 set(headers
-    TPZAnisotropicPermeability.h    
+    TPZAnisotropicPermeability.h 
     TPZIsotropicPermeability.h
     TPZDarcyFlow.h
+    TPZDarcyFlowAniso.h
     TPZHybridDarcyFlow.h
+    TPZHybridDarcyFlowAniso.h
+    TPZMixedDarcyFlowAniso.h
     TPZMixedDarcyFlow.h
-    TPZMixedDarcyFractureFlow.h
+    #TPZMixedDarcyFractureFlowAniso.h
     )
 set(sources
     TPZAnisotropicPermeability.cpp 
     TPZIsotropicPermeability.cpp
     TPZDarcyFlow.cpp
+    TPZDarcyFlowAniso.cpp
     TPZHybridDarcyFlow.cpp
+    TPZHybridDarcyFlowAniso.cpp
+    TPZMixedDarcyFlowAniso.cpp
     TPZMixedDarcyFlow.cpp
-    TPZMixedDarcyFractureFlow.cpp
+    #TPZMixedDarcyFractureFlowAniso.cpp
     )
 
 install(FILES ${public_headers} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Material/DarcyFlow)

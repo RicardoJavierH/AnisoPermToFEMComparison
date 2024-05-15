@@ -8,7 +8,7 @@
 #ifndef TPZMixedDarcyFractureFlow_h
 #define TPZMixedDarcyFractureFlow_h
 
-#include "TPZMixedDarcyFlow.h"
+#include "TPZMixedDarcyFlowA.h"
 
 class TPZMixedDarcyFractureFlow : public TPZMixedDarcyFlow {
     using TBase = TPZMixedDarcyFlow;

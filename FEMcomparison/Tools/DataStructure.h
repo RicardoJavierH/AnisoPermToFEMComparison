@@ -142,6 +142,7 @@ struct PreConfig{
 
 inline void ProblemConfig::InitializePermTensor(int dim, PreConfig &pConfig)
 {
+    this->exact = new TLaplaceExample1();
     perm = TPZFMatrix<STATE>(3, 3, 0);
     bool isIsotropic = (pConfig.type != 4) ? true : false;
     if (isIsotropic ){

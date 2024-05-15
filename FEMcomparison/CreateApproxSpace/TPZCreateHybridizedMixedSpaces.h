@@ -9,6 +9,7 @@
 #include <fstream>
 #include <ios>
 #include "TPZAnalyticSolution.h"
+#include "DataStructure.h"
 
 class TPZCreateHybridizedMixedSpaces {
 public:
@@ -95,7 +96,7 @@ public:
         fShouldCondense = isCondensed;
     }
 
-    TPZMultiphysicsCompMesh* GenerateMesh();
+    TPZMultiphysicsCompMesh* GenerateMesh(ProblemConfig& config);
 
     void Print(std::ostream &out = std::cout);
 
@@ -112,7 +113,8 @@ protected:
 
     TPZCompMesh* CreateConstantMesh(const int &lagNum);
 
-    void AddMaterials(TPZMultiphysicsCompMesh *mcmesh);
+    void AddMaterials(TPZMultiphysicsCompMesh *mcmesh, ProblemConfig& config );
+
 
     void AddInterfaceMaterial(TPZMultiphysicsCompMesh *mcmesh);
 

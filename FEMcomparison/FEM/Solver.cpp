@@ -77,7 +77,7 @@ void Solve(ProblemConfig &config, PreConfig &preConfig){
             createHMspace.SetNormalFluxOrder(config.k);
             createHMspace.SetPOrder(config.k + config.n);
             createHMspace.SetAnalyticSolution(config.exact);
-            multiCmesh = createHMspace.GenerateMesh();
+            multiCmesh = createHMspace.GenerateMesh(config);
         }
 #ifndef OPTMIZE_RUN_TIME
             config.exact.operator*().fSignConvention = 1;
@@ -397,7 +397,7 @@ if(myParInterface){
     std::cout << "Start Assembling\n";
     
 #ifdef FEMCOMPARISON_TIMER
-        auto beginAss = std::chrono::high_resolution_clock::now();
+        auto beginAssem = std::chrono::high_resolution_clock::now();
 
 #endif
         
@@ -410,8 +410,8 @@ if(myParInterface){
     }
         
 #ifdef FEMCOMPARISON_TIMER
-    auto endAss = std::chrono::high_resolution_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(endAss - beginAss);
+    auto endAssem = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(endAssem - beginAssem);
     pConfig.tData.assembleTime = static_cast<unsigned long int>(elapsed.count());
 #endif
 

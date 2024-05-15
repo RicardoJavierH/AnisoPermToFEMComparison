@@ -2,17 +2,17 @@
 // Created by Gustavo Batistela on 5/13/21.
 //
 
-#include "TPZMixedDarcyFlow.h"
+#include "TPZMixedDarcyFlowAniso.h"
 #include "TPZMaterialDataT.h"
 #include "pzaxestools.h"
 #include "TPZLapack.h"
 
 #define USEBLAS
 
-TPZMixedDarcyFlow::TPZMixedDarcyFlow() : TPZRegisterClassId(&TPZMixedDarcyFlow::ClassId),
+TPZMixedDarcyFlowAniso::TPZMixedDarcyFlowAniso() : TPZRegisterClassId(&TPZMixedDarcyFlowAniso::ClassId),
                                          TBase(), fDim(-1) {}
 
-[[maybe_unused]] TPZMixedDarcyFlow::TPZMixedDarcyFlow(int id, int dim) : TPZRegisterClassId(&TPZMixedDarcyFlow::ClassId),
+[[maybe_unused]] TPZMixedDarcyFlowAniso::TPZMixedDarcyFlowAniso(int id, int dim) : TPZRegisterClassId(&TPZMixedDarcyFlowAniso::ClassId),
                                                         TBase(id), fDim(dim)
 {
 }
@@ -20,14 +20,14 @@ TPZMixedDarcyFlow::TPZMixedDarcyFlow() : TPZRegisterClassId(&TPZMixedDarcyFlow::
 /**
          copy constructor
  */
-TPZMixedDarcyFlow::TPZMixedDarcyFlow(const TPZMixedDarcyFlow &copy) : TBase(copy), fDim(copy.fDim)
+TPZMixedDarcyFlowAniso::TPZMixedDarcyFlowAniso(const TPZMixedDarcyFlowAniso &copy) : TBase(copy), fDim(copy.fDim)
 {
     
 }
 /**
          copy constructor
  */
-TPZMixedDarcyFlow &TPZMixedDarcyFlow::operator=(const TPZMixedDarcyFlow &copy)
+TPZMixedDarcyFlowAniso &TPZMixedDarcyFlowAniso::operator=(const TPZMixedDarcyFlowAniso &copy)
 {
     TBase::operator=(copy);
     fDim = copy.fDim;
@@ -35,7 +35,7 @@ TPZMixedDarcyFlow &TPZMixedDarcyFlow::operator=(const TPZMixedDarcyFlow &copy)
 }
 
 
-void TPZMixedDarcyFlow::Contribute(const TPZVec<TPZMaterialDataT<STATE>> &datavec, REAL weight, TPZFMatrix<STATE> &ek,
+void TPZMixedDarcyFlowAniso::Contribute(const TPZVec<TPZMaterialDataT<STATE>> &datavec, REAL weight, TPZFMatrix<STATE> &ek,
                                    TPZFMatrix<STATE> &ef) {
 
     STATE force = 0;
@@ -44,8 +44,11 @@ void TPZMixedDarcyFlow::Contribute(const TPZVec<TPZMaterialDataT<STATE>> &datave
         fForcingFunction(datavec[1].x, res);
         force = res[0];
     }
-    const STATE perm = GetPermeability(datavec[0].x);
-    const STATE inv_perm = 1 / perm;
+    
+//    std::cout << "x[0]: "<< datavec[1].x[0] << ", "<<datavec[1].x[1] << ", "<<datavec[1].x[2]<<std::endl;
+//    std::cout << "force: " << force << std::endl;
+//    const STATE perm = GetPermeability(datavec[0].x);
+//    const STATE inv_perm = 1 / perm;
     
     // Setting the phis
     TPZFMatrix<REAL> &phiQ = datavec[0].phi;
@@ -56,6 +59,14 @@ void TPZMixedDarcyFlow::Contribute(const TPZVec<TPZMaterialDataT<STATE>> &datave
     TPZFNMatrix<9, REAL> dphiPXY(3, dphiP.Cols());
     TPZAxesTools<REAL>::Axes2XYZ(dphiP, dphiPXY, datavec[1].axes);
 
+    TPZFMatrix<STATE> permTensor,invPermTensor;
+    GetPermeability(datavec[0].x,permTensor,invPermTensor);
+    
+    const int spacedim = 3;
+    
+    permTensor.Resize(spacedim,spacedim);
+    invPermTensor.Resize(spacedim,spacedim);
+    
     REAL &faceSize = datavec[0].HSize;
 
     int phrq, phrp;
@@ -87,7 +98,7 @@ void TPZMixedDarcyFlow::Contribute(const TPZVec<TPZMaterialDataT<STATE>> &datave
     }
 #endif
 
-#if defined(USEBLAS) && defined(USING_LAPACK)
+#if defined(USEBLAS) && defined(USING_LAPACK) && defined(TOTOTO)
     TPZFNMatrix<3, REAL> ivec(3, phrq, 0.);
     for (int iq = 0; iq < phrq; iq++){
         //ef(iq, 0) += 0.;
@@ -190,9 +201,20 @@ void TPZMixedDarcyFlow::Contribute(const TPZVec<TPZMaterialDataT<STATE>> &datave
 
             //dot product between Kinv[u]v
             jvecZ.Zero();
-            for (int id = 0; id < 3; id++) {
-                jvecZ(id, 0) += inv_perm * jvec(id, 0);
-            }
+            
+//            for(int irow=0; irow<invP; irow++){
+//                for(int icol=0; icol<fDim; icol++){
+//                    for(int k=0; k<flux.Cols(); k++){
+//                        Kflux(irow,k) += permTensor(irow,icol)*flux(icol,k);
+//                    }
+//                }
+//            }
+            
+            invPermTensor.Multiply(jvec, jvecZ);
+            
+//            for (int id = 0; id < 3; id++) {
+//                jvecZ(id, 0) += inv_perm * jvec(id, 0);
+//            }
             REAL prod1 = ivec(0, 0) * jvecZ(0, 0) + ivec(1, 0) * jvecZ(1, 0) + ivec(2, 0) * jvecZ(2, 0);
             ek(iq, jq) += weight * phiQ(ishapeind, 0) * phiQ(jshapeind, 0) * prod1;
         }
@@ -248,7 +270,7 @@ void TPZMixedDarcyFlow::Contribute(const TPZVec<TPZMaterialDataT<STATE>> &datave
     }
 }
 
-void TPZMixedDarcyFlow::ContributeBC(const TPZVec<TPZMaterialDataT<STATE>> &datavec, REAL weight, TPZFMatrix<STATE> &ek,
+void TPZMixedDarcyFlowAniso::ContributeBC(const TPZVec<TPZMaterialDataT<STATE>> &datavec, REAL weight, TPZFMatrix<STATE> &ek,
                                      TPZFMatrix<STATE> &ef, TPZBndCondT<STATE> &bc) {
 
     int dim = Dimension();
@@ -266,10 +288,24 @@ void TPZMixedDarcyFlow::ContributeBC(const TPZVec<TPZMaterialDataT<STATE>> &data
         TPZFNMatrix<9, STATE> gradu(3, 1);
         bc.ForcingFunctionBC()(datavec[0].x, res, gradu);
 
-        const STATE perm = GetPermeability(datavec[0].x);
+//        std::cout << "datavec[0].x: " << datavec[0].x[0] << ", " << datavec[0].x[1] << ", " << datavec[0].x[2] << std::endl;
+//            gradu.Print(std::cout << "gradu: \n" );
+//        std::cout << "res: " << res << std::endl;
+        
+        TPZFMatrix<STATE> permTensor,invPermTensor;
+        GetPermeability(datavec[0].x,permTensor,invPermTensor);
+        const int spacedim = 3;
+        permTensor.Resize(spacedim,spacedim);
+        invPermTensor.Resize(spacedim,spacedim);
 
+        //const STATE perm = GetPermeability(datavec[0].x);
+
+        TPZFMatrix<STATE> KGradU(permTensor.Rows(),gradu.Cols());
+        
+        permTensor.Multiply(gradu, KGradU);
         for (int i = 0; i < 3; i++) {
-            normflux += datavec[0].normal[i] * perm * gradu(i, 0);
+            normflux += datavec[0].normal[i] * KGradU(i,0);
+            //normflux += datavec[0].normal[i] * perm * gradu(i, 0);
         }
 
         if (bc.Type() == 0 || bc.Type() == 4) {
@@ -348,12 +384,41 @@ void TPZMixedDarcyFlow::ContributeBC(const TPZVec<TPZMaterialDataT<STATE>> &data
     }
 }
 
-void TPZMixedDarcyFlow::Solution(const TPZVec<TPZMaterialDataT<STATE>> &datavec, int var, TPZVec<STATE> &solOut) {
+void TPZMixedDarcyFlowAniso::Solution(const TPZVec<TPZMaterialDataT<STATE>> &datavec, int var, TPZVec<STATE> &solOut) {
     solOut.Resize(this->NSolutionVariables(var));
     solOut.Fill(0.);
     TPZManVector<STATE, 10> SolP, SolQ;
-    const STATE perm = GetPermeability(datavec[0].x);
-    const STATE inv_perm = 1 / perm;
+    
+    
+    TPZFMatrix<STATE> permTensor,invPermTensor;
+    GetPermeability(datavec[0].x,permTensor,invPermTensor);
+    const int spacedim = 3;
+    permTensor.Resize(spacedim,spacedim);
+    invPermTensor.Resize(spacedim,spacedim);
+
+    TPZVec<STATE> exactSol(1);
+    TPZFNMatrix<3, STATE> gradu(3, 1);
+    if (fExactSol) {
+        fExactSol(datavec[0].x, exactSol, gradu);
+    }
+    
+    TPZFMatrix<STATE> KGradU;
+    permTensor.Multiply(gradu,KGradU);
+    
+    auto matvecmult = [&](TPZFMatrix<STATE> mat, TPZVec<STATE> vec)->TPZFMatrix<STATE>{
+        TPZFMatrix<STATE> res(3,1);
+        for(int irow=0; irow<3; irow++){
+            for(int icol=0; icol<3; icol++){
+                    res(irow,0) = mat(irow,icol)*vec[icol];
+            }
+        }
+        return res;
+    };
+    
+    TPZFMatrix<STATE> deriveQ = matvecmult(invPermTensor, datavec[0].sol[0]);
+    
+    //const STATE perm = GetPermeability(datavec[0].x);
+    //const STATE inv_perm = 1 / perm;
 
     // SolQ = datavec[0].sol[0];
     SolP = datavec[1].sol[0];
@@ -412,7 +477,7 @@ void TPZMixedDarcyFlow::Solution(const TPZVec<TPZMaterialDataT<STATE>> &datavec,
         }
 
         for (int i = 0; i < 3; i++) {
-            solOut[i] = -perm * gradu(i, 0);
+            solOut[i] = -KGradU(i, 0);
         }
 
         return;
@@ -460,12 +525,14 @@ void TPZMixedDarcyFlow::Solution(const TPZVec<TPZMaterialDataT<STATE>> &datavec,
             solOut[i] = 0.;
         }
         for (int i = 0; i < fDim; i++) {
-            solOut[i] -= inv_perm * datavec[0].sol[0][i];
+            solOut[i] -= deriveQ[i];
         }
         return;
     }
     if (var == 13) {
-        solOut[0] = perm;
+        permTensor.Diagonal(solOut[0]);
+        solOut[0] /= permTensor.Rows();
+        //solOut[0] = perm;
         return;
     }
 
@@ -498,14 +565,14 @@ void TPZMixedDarcyFlow::Solution(const TPZVec<TPZMaterialDataT<STATE>> &datavec,
             }
         }
         for (int i = 0; i < 3; i++) {
-            solOut[i] = -perm * gradu(i, 0);
+            solOut[i] = -KGradU(i, 0);
         }
 
         return;
     }
 }
 
-void TPZMixedDarcyFlow::Errors(const TPZVec<TPZMaterialDataT<STATE>> &data, TPZVec<REAL> &errors) {
+void TPZMixedDarcyFlowAniso::Errors(const TPZVec<TPZMaterialDataT<STATE>> &data, TPZVec<REAL> &errors) {
 
     /**
      * datavec[0]= Flux
@@ -542,24 +609,83 @@ void TPZMixedDarcyFlow::Errors(const TPZVec<TPZMaterialDataT<STATE>> &data, TPZV
     if(data[1].sol[0].size())
         pressurefem[0] = data[1].sol[0][0];
 
-    const STATE perm = GetPermeability(data[0].x);
-    const STATE inv_perm = 1 / perm;
+    TPZFMatrix<STATE> permTensor,invPermTensor;
+    GetPermeability(data[0].x,permTensor,invPermTensor);
+    TPZFMatrix<STATE> KGradPressure;
+    
+//    const STATE perm = GetPermeability(data[0].x);
+//    const STATE inv_perm = 1 / perm;
 
     TPZManVector<STATE, 3> gradpressurefem(3, 0.);
     this->Solution(data, VariableIndex("GradPressure"), gradpressurefem);
 
     TPZManVector<STATE, 3> fluxexact(3, 0);
     TPZManVector<STATE, 3> gradpressure(3, 0);
+
     for (int i = 0; i < 3; i++) {
         gradpressure[i] = du_exact[i];
-        fluxexact[i] = -perm * gradpressure[i];
     }
 
-    REAL L2flux = 0., L2grad = 0.;
+    auto matvecmult = [&](TPZFMatrix<STATE> mat, TPZVec<STATE> vec)->TPZVec<STATE>{
+        TPZVec<STATE> res(3,0);
+        for(int irow=0; irow<3; irow++){
+            for(int icol=0; icol<3; icol++){
+                    res[irow] += mat(irow,icol)*vec[icol];
+                //std::cout << "res[" << irow << "]: " << res[irow] << std::endl;
+            }
+        }
+        return res;
+    };
+    fluxexact = matvecmult(permTensor, gradpressure);
+    
+
     for (int i = 0; i < 3; i++) {
-        L2flux += (fluxfem[i] - fluxexact[i]) * inv_perm * (fluxfem[i] - fluxexact[i]);
-        L2grad += (du_exact[i] - gradpressurefem[i]) * (du_exact[i] - gradpressurefem[i]);
+        fluxexact[i] *= -1.;
+        
     }
+    
+    TPZVec<STATE> invFluxFem = matvecmult(invPermTensor, fluxfem);
+    TPZVec<STATE> invFluxExact = matvecmult(invPermTensor, fluxexact);
+    
+    auto PrintMyVec = [=](TPZVec<STATE> myvec, std::string myname)
+    {
+        std::cout << myname << " = {";
+        for(int i=0; i<myvec.size(); i++){
+            std::cout << myvec[i] << ", ";
+        }
+        std::cout << "}\n";
+
+    };
+    
+//    permTensor.Print(std::cout << "permTensor\n");
+//    invPermTensor.Print(std::cout << "invPermTensor\n");
+
+    
+    
+    REAL L2flux = 0., L2grad = 0.;
+    
+//    std::cout << "x[0]: "<< data[0].x[0] << ", "<<data[0].x[1] << ", "<<data[0].x[2]<<std::endl;
+//        PrintMyVec(fluxfem, "fluxfem");
+//        PrintMyVec(fluxexact, "fluxexact");
+//        PrintMyVec(invFluxFem, "invFluxFem");
+//        PrintMyVec(invFluxExact, "invFluxExact");
+//        du_exact.Print(std::cout << "du_exact " << std::endl);
+//        PrintMyVec(gradpressurefem, "gradpressurefem");
+
+    for (int i = 0; i < 3; i++) {
+        L2flux += (fluxfem[i] - fluxexact[i]) * (invFluxFem[i] - invFluxExact[i]);
+        //L2flux += (fluxfem[i] - fluxexact[i]) * inv_perm * (fluxfem[i] - fluxexact[i]);
+        L2grad += (du_exact(i,0) - gradpressurefem[i]) * (du_exact(i,0) - gradpressurefem[i]);
+    }
+    
+//    std::cout << "x[0]: "<< data[1].x[0] << ", "<<data[1].x[1] << ", "<<data[1].x[2]<<std::endl;
+//    std::cout << "gradpressurefem\n";
+//    std::cout <<  du_exact[0] << ", "<<du_exact[1] << ", "<<du_exact[2]<<std::endl;
+    
+//    std::cout << "L2flux: " << L2flux << std::endl;
+//    std::cout << "L2grad: " << L2grad << std::endl;
+//   DebugStop();
+//
     errors[0] = (pressurefem[0] - u_exact[0]) * (pressurefem[0] - u_exact[0]);//L2 error for pressure
     errors[1] = L2flux;//L2 error for flux
     errors[2] = residual;//L2 for div
@@ -567,7 +693,7 @@ void TPZMixedDarcyFlow::Errors(const TPZVec<TPZMaterialDataT<STATE>> &data, TPZV
     errors[4] = L2flux + residual;
 }
 
-int TPZMixedDarcyFlow::VariableIndex(const std::string &name) const {
+int TPZMixedDarcyFlowAniso::VariableIndex(const std::string &name) const {
     if (!strcmp("Flux", name.c_str())) return 1;
     if (!strcmp("Pressure", name.c_str())) return 2;
     if (!strcmp("GradFluxX", name.c_str())) return 3;
@@ -588,7 +714,7 @@ int TPZMixedDarcyFlow::VariableIndex(const std::string &name) const {
     return -1;
 }
 
-int TPZMixedDarcyFlow::NSolutionVariables(int var) const {
+int TPZMixedDarcyFlowAniso::NSolutionVariables(int var) const {
     if (var == 1) return 3;
     if (var == 2) return 1;
     if (var == 3) return 3;
@@ -608,26 +734,26 @@ int TPZMixedDarcyFlow::NSolutionVariables(int var) const {
     return -1;
 }
 
-void TPZMixedDarcyFlow::SetDimension(int dim) {
+void TPZMixedDarcyFlowAniso::SetDimension(int dim) {
     if (dim > 3 || dim < 1) DebugStop();
     fDim = dim;
 }
 
-int TPZMixedDarcyFlow::ClassId() const {
-    return Hash("TPZMixedDarcyFlow") ^ TBase::ClassId() << 1;
+int TPZMixedDarcyFlowAniso::ClassId() const {
+    return Hash("TPZMixedDarcyFlowAniso") ^ TBase::ClassId() << 1;
 }
 
-TPZMaterial *TPZMixedDarcyFlow::NewMaterial() const {
-    return new TPZMixedDarcyFlow(*this);
+TPZMaterial *TPZMixedDarcyFlowAniso::NewMaterial() const {
+    return new TPZMixedDarcyFlowAniso(*this);
 }
 
-void TPZMixedDarcyFlow::Print(std::ostream &out) const {
+void TPZMixedDarcyFlowAniso::Print(std::ostream &out) const {
     out << "Material Name: " << this->Name() << "\n";
     out << "Material Id: " << this->Id() << "\n";
     out << "Dimension: " << this->Dimension() << "\n\n";
 }
 
-void TPZMixedDarcyFlow::FillDataRequirements(TPZVec<TPZMaterialDataT<STATE>> &datavec) const {
+void TPZMixedDarcyFlowAniso::FillDataRequirements(TPZVec<TPZMaterialDataT<STATE>> &datavec) const {
     int nref = datavec.size();
     for (int i = 0; i < nref; i++) {
         datavec[i].SetAllRequirements(false);
@@ -639,7 +765,7 @@ void TPZMixedDarcyFlow::FillDataRequirements(TPZVec<TPZMaterialDataT<STATE>> &da
 }
 
 void
-TPZMixedDarcyFlow::FillBoundaryConditionDataRequirements(int type, TPZVec<TPZMaterialDataT<STATE>> &datavec) const {
+TPZMixedDarcyFlowAniso::FillBoundaryConditionDataRequirements(int type, TPZVec<TPZMaterialDataT<STATE>> &datavec) const {
     // default is no specific data requirements
     int nref = datavec.size();
     for (int iref = 0; iref < nref; iref++) {

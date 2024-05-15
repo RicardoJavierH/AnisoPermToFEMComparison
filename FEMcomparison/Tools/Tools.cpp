@@ -19,6 +19,7 @@
 #include "pzcondensedcompel.h"
 #include "pzelementgroup.h"
 #include "TPZFrontSym.h"
+#include "DarcyFlow/TPZMixedDarcyFlowAniso.h"
 
 using namespace std;
 
@@ -96,7 +97,7 @@ TPZCompMesh* CreateFluxHDivMesh(const ProblemConfig& problem) {
 TPZMultiphysicsCompMesh* CreateHDivMesh(const ProblemConfig& problem) {
     
     TPZMultiphysicsCompMesh* cmesh = new TPZMultiphysicsCompMesh(problem.gmesh);
-    TPZMixedDarcyFlow* mat = NULL;
+    TPZMaterial* mat = NULL;
     TPZFMatrix<REAL> K(3, 3, 0), invK(3, 3, 0);
     K.Identity();
     invK.Identity();
@@ -123,18 +124,19 @@ TPZMultiphysicsCompMesh* CreateHDivMesh(const ProblemConfig& problem) {
 //    invK.Print(std::cout);
     
     for (auto matid : problem.materialids) {
-        TPZMixedDarcyFlow *mix = new TPZMixedDarcyFlow(matid, cmesh->Dimension());
 #ifndef OPTMIZE_RUN_TIME
+        TPZMixedDarcyFlowAniso *mix = new TPZMixedDarcyFlowAniso(matid, cmesh->Dimension());
         mix->SetForcingFunction(problem.exact->ForceFunc(),5);
-        
         mix->SetExactSol(problem.exact->ExactSolution(),5);
-#endif
-        //mix->SetPermeabilityTensor(K, invK);
-        //mix->SetConstantPermeability(1.);
         TPZFMatrix<STATE> KPerm = problem.perm;
         mix->SetPermeability(KPerm);
         if (!mat) mat = mix;
-
+        
+#else
+        TPZMixedDarcyFlow *mix = new TPZMixedDarcyFlow(matid, cmesh->Dimension());
+        mix->SetConstantPermeability(1.);
+#endif
+                
         cmesh->InsertMaterialObject(mix);
     }
         
@@ -164,13 +166,18 @@ TPZMultiphysicsCompMesh* CreateHDivMesh(const ProblemConfig& problem) {
             break;
             }
         }
-        
-        TPZBndCondT<STATE>* bc = mat->CreateBC(mat, matid, bctype, val1, val2);
-        
+                
 #ifndef OPTMIZE_RUN_TIME
+        TPZMixedDarcyFlowAniso* mat = dynamic_cast<TPZMixedDarcyFlowAniso*>(mat);
+        TPZBndCondT<STATE>* bc = mat->CreateBC(mat, matid, bctype, val1, val2);
         bc->SetForcingFunctionBC(problem.exact.operator*().ExactSolution(),5);
-#endif
         cmesh->InsertMaterialObject(bc);
+
+#else
+        TPZMixedDarcyFlow* mat = dynamic_cast<TPZMixedDarcyFlow*>(mat);
+        TPZBndCondT<STATE>* bc = mat->CreateBC(mat, matid, bctype, val1, val2);
+        cmesh->InsertMaterialObject(bc);
+#endif
     }
     cmesh->ApproxSpace().SetAllCreateFunctionsMultiphysicElem();
     

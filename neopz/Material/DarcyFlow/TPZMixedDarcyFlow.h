@@ -2,14 +2,14 @@
 // Created by Gustavo Batistela on 5/13/21.
 //
 
-#ifndef TPZMIXEDDARCYFLOW_H
-#define TPZMIXEDDARCYFLOW_H
+#ifndef TPZMixedDarcyFlow_H
+#define TPZMixedDarcyFlow_H
 
 #include "TPZMatBase.h"
 #include "TPZMatCombinedSpaces.h"
 #include "TPZMatErrorCombinedSpaces.h"
 #include "TPZIsotropicPermeability.h"
-#include "TPZAnisotropicPermeability.h"
+
 /**
  * @ingroup material
  * @brief This class implements a mixed approximation for the Darcy flow equation for isotropic materials.
@@ -23,11 +23,11 @@
  */
 
 class TPZMixedDarcyFlow : public TPZMatBase<STATE, TPZMatCombinedSpacesT<STATE>,
-        TPZMatErrorCombinedSpaces<STATE>,TPZAnisotropicPermeability> {
+        TPZMatErrorCombinedSpaces<STATE>, TPZIsotropicPermeability> {
 
     // type alias to improve constructor readability
     using TBase = TPZMatBase<STATE, TPZMatCombinedSpacesT<STATE>,
-            TPZMatErrorCombinedSpaces<STATE>, TPZAnisotropicPermeability>;
+            TPZMatErrorCombinedSpaces<STATE>, TPZIsotropicPermeability>;
 
 public:
     /**
@@ -160,4 +160,4 @@ protected:
 
 };
 
-#endif //TPZMIXEDDARCYFLOW_H
+#endif //TPZMixedDarcyFlow_H

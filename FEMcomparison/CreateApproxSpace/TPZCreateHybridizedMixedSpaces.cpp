@@ -10,6 +10,7 @@
 #include "TPZNullMaterialCS.h"
 #include "TPZLagrangeMultiplierCS.h"
 #include "DarcyFlow/TPZMixedDarcyFlow.h"
+#include "DarcyFlow/TPZMixedDarcyFlowAniso.h"
 #include "LCC_MultiphysicsInterfaceEl.h"
 #include <sstream>
 #include "pzelementgroup.h"
@@ -214,16 +215,25 @@ TPZCompMesh* TPZCreateHybridizedMixedSpaces::CreateConstantMesh(const int &lagNu
     return constMesh;
 }
 
-void TPZCreateHybridizedMixedSpaces::AddMaterials(TPZMultiphysicsCompMesh *mcmesh){
+void TPZCreateHybridizedMixedSpaces::AddMaterials(TPZMultiphysicsCompMesh *mcmesh, ProblemConfig& config ){
 
     int meshDim = mcmesh->Dimension();
-
+#ifndef OPTMIZE_RUN_TIME
+    TPZMixedDarcyFlowAniso* refmat = 0;
+#else
     TPZMixedDarcyFlow* refmat = 0;
+#endif
+    
     for(auto it : fMaterialIds){
+#ifndef OPTMIZE_RUN_TIME
+        TPZMixedDarcyFlowAniso *mat = new TPZMixedDarcyFlowAniso(it,meshDim);
+#else
         TPZMixedDarcyFlow *mat = new TPZMixedDarcyFlow(it,meshDim);
+#endif
         mcmesh->InsertMaterialObject(mat);
         refmat = mat;
 #ifndef OPTMIZE_RUN_TIME
+        mat->SetPermeability(config.perm);
         mat->SetForcingFunction(fAnalyticSolution->ForceFunc(),5);
         mat->SetExactSol(fAnalyticSolution->ExactSolution(),5);
 #else
@@ -366,7 +376,7 @@ std::string TPZCreateHybridizedMixedSpaces::SpaceTypeName(){
     return spaceName;
 }
 
-TPZMultiphysicsCompMesh* TPZCreateHybridizedMixedSpaces::GenerateMesh(){
+TPZMultiphysicsCompMesh* TPZCreateHybridizedMixedSpaces::GenerateMesh(ProblemConfig& config){
     {
         ConditioningGeomesh();
         TPZCompMesh *hdivMesh = CreateDiscHDivMesh();
@@ -379,7 +389,7 @@ TPZMultiphysicsCompMesh* TPZCreateHybridizedMixedSpaces::GenerateMesh(){
         TPZMultiphysicsCompMesh *mcmesh = new TPZMultiphysicsCompMesh(fGeoMesh);
         mcmesh->ApproxSpace().SetAllCreateFunctionsMultiphysicElem();
 
-        AddMaterials(mcmesh);
+        AddMaterials(mcmesh,config);
         mcmesh->BuildMultiphysicsSpace(meshvec);
 
         AddInterfaceMaterial(mcmesh);

@@ -2,8 +2,8 @@
 // Created by Gustavo Batistela on 5/13/21.
 //
 
-#ifndef TPZDarcyFlow_H
-#define TPZDarcyFlow_H
+#ifndef TPZDarcyFlowAniso_H
+#define TPZDarcyFlowAniso_H
 
 #include "TPZMatBase.h"
 #include "TPZMatSingleSpace.h"
@@ -21,7 +21,7 @@
  * @see TPZIsotropicPermeability For setting the permeability field.
  */
 
-class TPZDarcyFlow : public TPZMatBase<STATE, TPZMatSingleSpaceT<STATE>,
+class TPZDarcyFlowAniso : public TPZMatBase<STATE, TPZMatSingleSpaceT<STATE>,
         TPZMatErrorSingleSpace<STATE>, TPZIsotropicPermeability> {
 
     // type alias to improve constructor readability
@@ -31,23 +31,23 @@ public:
     /**
      * @brief Default constructor
      */
-    TPZDarcyFlow();
+    TPZDarcyFlowAniso();
 
     /**
 	 * @brief Class constructor
 	 * @param [in] id material id
 	 * @param [in] dim problem dimension
 	 */
-    TPZDarcyFlow(int id, int dim);
+    TPZDarcyFlowAniso(int id, int dim);
 
-            TPZDarcyFlow(const TPZDarcyFlow &copy);
+            TPZDarcyFlowAniso(const TPZDarcyFlowAniso &copy);
 
-            TPZDarcyFlow& operator=(const TPZDarcyFlow &copy);
+            TPZDarcyFlowAniso& operator=(const TPZDarcyFlowAniso &copy);
 
     /**
 	 * @brief Returns a 'std::string' with the name of the material
 	 */
-    [[nodiscard]] std::string Name() const override { return "TPZDarcyFlow"; }
+    [[nodiscard]] std::string Name() const override { return "TPZDarcyFlowAniso"; }
 
     /**
 	 * @brief Returns the problem dimension
@@ -101,7 +101,7 @@ public:
 
     /**
      * @brief Returns an integer with the dimension of a post-processing variable
-     * @param [in] var index of the post-processing variable, according to TPZDarcyFlow::VariableIndex method.
+     * @param [in] var index of the post-processing variable, according to TPZDarcyFlowAniso::VariableIndex method.
      */
     [[nodiscard]] int NSolutionVariables(int var) const override;
 
@@ -163,4 +163,4 @@ protected:
     int fDim;
 };
 
-#endif //TPZDarcyFlow_H
+#endif //TPZDarcyFlowAniso_H
